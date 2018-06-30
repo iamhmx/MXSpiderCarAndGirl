@@ -11,3 +11,4 @@ cd MXSpiderCarAndGirl
 python spider.py 
 ```
 ## 效果
+![效果图](https://github.com/iamhmx/MXSpiderCarAndGirl/blob/master/image.png?raw=true)
