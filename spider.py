@@ -2,7 +2,7 @@ import requests
 from pyquery import PyQuery as pq
 import re
 import os
-from settings import base_url, headers
+from settings import BASE_URL, HEADERS, MODE
 from multiprocessing import Pool
 from time import sleep
 from hashlib import md5
@@ -24,7 +24,7 @@ def get_page(url):
     :return: None or text
     """
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=HEADERS)
         if response.status_code == 200:
             return response.text
         else:
@@ -40,7 +40,7 @@ def get_module_urls():
     获取2个模块对应的url
     :return: 2个模块的url
     """
-    text = get_page(base_url)
+    text = get_page(BASE_URL)
     if text:
         urls = []
         doc = pq(text)
@@ -81,7 +81,7 @@ def parse_one_page(url):
         doc = pq(text)
         # detail_urls = []
         for li in doc('.ulPic.p135.clearfix li').items():
-            detail_url = base_url + str(li('a').attr('href')).split('..')[-1]
+            detail_url = BASE_URL + str(li('a').attr('href')).split('..')[-1]
             print(detail_url)
             # detail_urls.append(detail_url)
             parse_detail_page(detail_url)
@@ -98,6 +98,9 @@ def parse_detail_page(url):
     text = get_page(url)
     if text:
         doc = pq(text)
+        # 取出图组名称
+        title = re.compile('(.*?)\(', re.S).search(doc('.mark em').text()).group(1)
+        print('title:', title)
         total = int(doc('#totalImgNum').text())
         next_page_url = re.compile('nLink.*?=.*?(.*?),', re.S).search(text).group(1)
         print('next_page_url:', next_page_url)
@@ -106,34 +109,42 @@ def parse_detail_page(url):
         print('first_no:', first_page_no)
         for page_no in range(0, total):
             no = first_page_no + page_no
-            url = base_url+'/group/{}.html'.format(no)
+            url = BASE_URL+'/{}/{}.html'.format(MODE, no)
             print('第%s张图片url：%s' % (page_no+1, url))
-            parse_img(url)
+            parse_img(title, url)
             sleep(1)
 
 
-def parse_img(url):
+def parse_img(title, url):
     text = get_page(url)
     if text:
         doc = pq(text)
         img_url = 'http:' + doc('#pic_img').attr('src')
         print('图片地址：', img_url)
-        download_img(img_url)
+        download_img(title, img_url)
     else:
         print('解析图片出错：', url)
 
 
-def download_img(url):
+def download_img(title, url):
     print('正在下载：', url)
     response = requests.get(url)
     if response.status_code == 200:
+        images_path = '{}{}images'.format(os.getcwd(), os.sep)
+        if not os.path.exists(images_path):
+            print('文件夹不存在，创建：', images_path)
+            os.mkdir(images_path)
+        img_group_path = '{}{}{}'.format(images_path, os.sep, title)
+        if not os.path.exists(img_group_path):
+            print('创建图组文件夹：', img_group_path)
+            os.mkdir(img_group_path)
         # 将图片md5值作为图片名
-        path = '{}{}images{}{}.jpg'.format(os.getcwd(), os.sep, os.sep, md5(response.content).hexdigest())
-        if not os.path.exists(path):
-            with open(path, 'wb') as fp:
+        img_path = '{}{}{}.jpg'.format(img_group_path, os.sep, md5(response.content).hexdigest())
+        if not os.path.exists(img_path):
+            with open(img_path, 'wb') as fp:
                 fp.write(response.content)
         else:
-            print('该图片已存在~')
+            print('该图片已存在')
 
 
 if __name__ == '__main__':
