@@ -1,14 +1,15 @@
 from scrapy import Spider
 from scrapy.http import Request
-from ..settings import BASE_URL, MODE
 import re
 from ..items import CarAndGirlItem
 
 
 class CarAndGirlSpider(Spider):
     name = 'carandgirl'
-    start_urls = [BASE_URL]
     img_urls = []
+
+    def start_requests(self):
+        yield Request(url=self.settings['BASE_URL'], callback=self.parse)
 
     def parse(self, response):
         for module_url in response.css('.mark a[target="_self"]::attr("href")').extract()[1:-1]:
@@ -16,14 +17,13 @@ class CarAndGirlSpider(Spider):
             yield Request(response.urljoin(module_url), callback=self.parse_module)
 
     def parse_module(self, response):
-        print('res:', response)
         # 解析出每一页的详情页面地址
         for detail_url in response.css('.ulPic.p135.clearfix li a::attr("href")').extract():
-            print('detail_url:', response.urljoin(detail_url))
+            # print('detail_url:', response.urljoin(detail_url))
             yield Request(response.urljoin(detail_url), callback=self.parse_detail_page)
         # 解析出每一页的地址
         for page_url in response.css('.pcauto_page a::attr("href")').extract()[:-1]:
-            print('page_url:', response.urljoin(page_url))
+            # print('page_url:', response.urljoin(page_url))
             yield Request(response.urljoin(page_url), callback=self.parse_module)
 
     def parse_detail_page(self, response):
@@ -40,7 +40,7 @@ class CarAndGirlSpider(Spider):
         first_page_no = int(re.compile('.*?(\d+).html', re.S).search(next_page_url).group(1)) - 1
         for page_no in range(0, total):
             no = first_page_no + page_no
-            url = BASE_URL+'/{}/{}.html'.format(MODE, no)
+            url = self.settings['BASE_URL']+'/{}/{}.html'.format(self.settings['MODE'], no)
             print('第%s张图片url：%s' % (page_no+1, url))
             yield Request(url, callback=self.parse_image)
         item['image_urls'] = self.img_urls
